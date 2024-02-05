@@ -12,7 +12,7 @@ contract NewsAPIConsumer is ChainlinkClient, Ownable {
     FlagsInterface internal chainlinkFlags;
 
     // Clave de la API de NewsAPI
-    string public apiKey; // agrega API_key proporcionada por NewsAPI
+    string public apiKey;
 
     // Evento que se emite cuando se actualizan los datos de la API de NewsAPI
     event NewsUpdated(string[] articles);
@@ -77,3 +77,4 @@ contract NewsAPIConsumer is ChainlinkClient, Ownable {
         // Emitir el evento para notificar que se han actualizado los datos
         emit NewsUpdated(_articles);
     }
+}
