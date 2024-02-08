@@ -1,35 +1,33 @@
-# News-Consumer-Politics
+# Certus Protocol Token
 
-This smart contract is designed to consume the NewsAPI API and fetch the latest policy related articles. It uses Chainlink as an oracle to make HTTP calls and fetch external data.
+Certus Protocol Token is an ERC20 token contract that includes functionality to interact with the Chainlink oracle for fetching data from the NewsAPI. It also implements standard ERC20 token functionalities such as minting, burning, and transferring tokens.
 
-## Requirements
+## Features
 
-Before you get started, make sure you have the following:
+- Fetches data from the NewsAPI using the Chainlink oracle.
+- Maintains a list of articles obtained from the NewsAPI.
+- Supports standard ERC20 token functionalities.
+- Allows the owner to withdraw ETH and ERC20 tokens sent to the contract.
 
-NewsAPI API key: You must obtain a NewsAPI API key to authenticate your requests. You can obtain it by registering with NewsAPI.
+## Deployment
 
-LINK funds in the contract: Make sure you have LINK funds in the contract to pay oracle fees. You can request LINK on the test network through the Chainlink faucet.
+The contract can be deployed on an Ethereum-compatible blockchain network using tools like Remix, Truffle, or Hardhat. Before deployment, make sure to set the necessary parameters such as the Chainlink oracle address, job ID, and fee, as well as the API key for accessing the NewsAPI.
 
-## Configuration.
+## Usage
 
-Before deploying the contract, you need to make some configurations:
+1. Deploy the contract to an Ethereum-compatible blockchain network.
+2. Set the Chainlink oracle address, job ID, and fee using the constructor.
+3. Set the API key for accessing the NewsAPI using the `setApiKey` function.
+4. Mint initial tokens using the constructor or any other designated function.
+5. Interact with the contract to fetch news data from the NewsAPI and perform token transfers.
 
-Flags contract address: configure the Flags contract address, which is used to check if the Chainlink oracle is online. This address may vary depending on the network environment.
+## Dependencies
 
-Oracle Contract Address: configure the address of the Chainlink oracle contract that will be used to make HTTP calls. This address may also vary depending on the network.
+- OpenZeppelin Contracts: Library for secure smart contract development.
+- Chainlink Client: Library for interacting with Chainlink oracles.
+- Solidity Compiler: Compiler for Solidity smart contracts.
 
-# Contract Deployment
+## License
 
-Deploy the contract to the network of your choice, making sure you have sufficient LINK funds in the contract.
-
-## Using the Contract
-
-Once deployed, follow these steps to use the contract:
-
-Set API Key: Call the setApiKey function to set your NewsAPI API key.
-
-Update News: Call the updateNews function to make a NewsAPI API call and get the latest policy-related articles.
-
-Check the Articles: You can access the updated articles by calling the articles function.
-
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
