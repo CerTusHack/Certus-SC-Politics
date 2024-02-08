@@ -1,23 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
-import "@chainlink/contracts/src/v0.8/vendor/Ownable.sol";
 
-contract NewsAPIConsumer is ChainlinkClient, Ownable {
-    using Chainlink for Chainlink.Request;
+contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
+    // Constants
+    uint256 public constant MAX_SUPPLY = 2_850_000 * 10**18; // 5% of initial circulating supply mentioned in the whitepaper's tokenomics
+    uint256 public constant INITIAL_SUPPLY = 350_000 * 10**18; // Initial supply for token in arbitrum
+    uint256 public constant COMMUNITY_PRESALE_ALLOCATION = 1_500_000 * 10**18; // Allocation for presale campaign
 
-    // Dirección del contrato de Flags
-    address constant private FLAGS_ADDRESS = 0x491B1dDA0A8fa069bbC1125133A975BF4e85a91b;
-    FlagsInterface internal chainlinkFlags;
+    // Chainlink variables
+    address private oracle;
+    bytes32 private jobId;
+    uint256 private fee;
 
-    // Clave de la API de NewsAPI
+    // API key for the NewsAPI
     string public apiKey;
 
-    // Evento que se emite cuando se actualizan los datos de la API de NewsAPI
+    // Event emitted when the NewsAPI data is updated
     event NewsUpdated(string[] articles);
 
-    // Estructura para almacenar los datos de un artículo
+    // Structure to store article data
     struct Article {
         string title;
         string description;
@@ -25,47 +31,42 @@ contract NewsAPIConsumer is ChainlinkClient, Ownable {
         uint256 publishedAt;
     }
 
-    // Almacena la lista de artículos obtenidos de la API de NewsAPI
+    // Array to store articles obtained from the NewsAPI
     Article[] public articles;
 
-    // Modificador que requiere que se establezca una clave API válida
-    modifier validApiKey() {
-        require(bytes(apiKey).length > 0, "API key not set");
-        _;
+    // Constructor
+    constructor(address _oracle, bytes32 _jobId, uint256 _fee) ERC20("Certus Protocol Token", "CERTUS") {
+        oracle = _oracle;
+        jobId = _jobId;
+        fee = _fee;
+
+        // Mint initial supply to contract creator
+        _mint(msg.sender, INITIAL_SUPPLY);
+
+        // Transfer tokens for community pre-sale
+        _transfer(msg.sender, address(this), COMMUNITY_PRESALE_ALLOCATION);
     }
 
-    // Constructor que establece la dirección del contrato de Flags
-    constructor() {
-        chainlinkFlags = FlagsInterface(FLAGS_ADDRESS);
-    }
-
-    // Función para establecer la clave API
+    // Function to set the API key
     function setApiKey(string memory _apiKey) external onlyOwner {
         apiKey = _apiKey;
     }
 
-    // Función para obtener los datos más recientes de la API de NewsAPI
-    function updateNews() external validApiKey onlyOwner {
-        // Construir la solicitud para la API de NewsAPI
-        Chainlink.Request memory req = buildChainlinkRequest(
-            jobId,
-            address(this),
-            this.fulfillNews.selector
-        );
+    // Function to update news data from the NewsAPI using Chainlink oracle
+    function updateNews() external onlyOwner {
+        Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.fulfillNews.selector);
         req.add("url", "https://newsapi.org/v2/top-headlines?q=politics&apiKey=" + apiKey);
         req.add("path", "articles[*].[title,description,url,publishedAt]");
-
-        // Enviar la solicitud al oráculo de Chainlink
-        sendChainlinkRequest(req, fee);
+        sendChainlinkRequestTo(oracle, req, fee);
     }
 
-    // Función para manejar la respuesta de la API de NewsAPI
+    // Function to handle response from the NewsAPI
     function fulfillNews(bytes32 _requestId, string[] memory _articles) public recordChainlinkFulfillment(_requestId) {
-        // Limpiar los artículos existentes
+        // Clear existing articles
         delete articles;
 
-        // Convertir los datos de la respuesta en objetos Article y almacenarlos en la lista de artículos
-        for (uint i = 0; i < _articles.length; i += 4) {
+        // Convert response data into Article objects and store them in the articles array
+        for (uint256 i = 0; i < _articles.length; i += 4) {
             articles.push(Article({
                 title: _articles[i],
                 description: _articles[i + 1],
@@ -74,7 +75,18 @@ contract NewsAPIConsumer is ChainlinkClient, Ownable {
             }));
         }
 
-        // Emitir el evento para notificar que se han actualizado los datos
+        // Emit event to notify that the data has been updated
         emit NewsUpdated(_articles);
+    }
+
+    // Function to withdraw ETH sent to this contract
+    function withdrawETH() external onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+    // Function to withdraw any ERC20 tokens sent to this contract
+    function withdrawTokens(address tokenAddress) external onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        token.transfer(owner(), token.balanceOf(address(this)));
     }
 }
