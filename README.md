@@ -1,35 +1,35 @@
 # News-Consumer-Politics
 
-Este contrato inteligente está diseñado para consumir la API de NewsAPI y obtener los últimos artículos relacionados con la política. Utiliza Chainlink como oráculo para realizar llamadas HTTP y obtener datos externos.
+This smart contract is designed to consume the NewsAPI API and fetch the latest policy related articles. It uses Chainlink as an oracle to make HTTP calls and fetch external data.
 
-## Requisitos
+## Requirements
 
-Antes de comenzar, asegúrate de tener lo siguiente:
+Before you get started, make sure you have the following:
 
-Clave de API de NewsAPI: Debes obtener una clave de API de NewsAPI para autenticar tus solicitudes. Puedes obtenerla registrándote en NewsAPI.
+NewsAPI API key: You must obtain a NewsAPI API key to authenticate your requests. You can obtain it by registering with NewsAPI.
 
-Fondos LINK en el Contrato: Asegúrate de tener fondos LINK en el contrato para pagar las tarifas del oráculo. Puedes solicitar LINK en la red de prueba a través del faucet de Chainlink.
+LINK funds in the contract: Make sure you have LINK funds in the contract to pay oracle fees. You can request LINK on the test network through the Chainlink faucet.
 
-## Configuración
+## Configuration.
 
-Antes de desplegar el contrato, debes realizar algunas configuraciones:
+Before deploying the contract, you need to make some configurations:
 
-Dirección del Contrato Flags: Configura la dirección del contrato de Flags, que se utiliza para verificar si el oráculo de Chainlink está en línea. Esta dirección puede variar según el entorno de red.
+Flags contract address: configure the Flags contract address, which is used to check if the Chainlink oracle is online. This address may vary depending on the network environment.
 
-Dirección del Contrato Oráculo: Configura la dirección del contrato de oráculo de Chainlink que se utilizará para realizar las llamadas HTTP. Esta dirección también puede variar según la red.
+Oracle Contract Address: configure the address of the Chainlink oracle contract that will be used to make HTTP calls. This address may also vary depending on the network.
 
-# Despliegue del Contrato
+# Contract Deployment
 
-Despliega el contrato en la red de tu elección, asegurándote de tener suficientes fondos LINK en el contrato.
+Deploy the contract to the network of your choice, making sure you have sufficient LINK funds in the contract.
 
-## Uso del Contrato
+## Using the Contract
 
-Una vez desplegado, sigue estos pasos para utilizar el contrato:
+Once deployed, follow these steps to use the contract:
 
-Establece la Clave de API: Llama a la función setApiKey para establecer tu clave de API de NewsAPI.
+Set API Key: Call the setApiKey function to set your NewsAPI API key.
 
-Actualiza las Noticias: Llama a la función updateNews para realizar una llamada a la API de NewsAPI y obtener los últimos artículos relacionados con la política.
+Update News: Call the updateNews function to make a NewsAPI API call and get the latest policy-related articles.
 
-Consulta los Artículos: Puedes acceder a los artículos actualizados llamando a la función articles.
+Check the Articles: You can access the updated articles by calling the articles function.
 
-Recuerda que este contrato es un ejemplo educativo y no debe utilizarse en entornos de producción sin una auditoría adecuada.
+
