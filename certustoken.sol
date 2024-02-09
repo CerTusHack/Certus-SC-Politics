@@ -11,6 +11,8 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     uint256 public constant MAX_SUPPLY = 2_850_000 * 10**18; // 5% of initial circulating supply mentioned in the whitepaper's tokenomics
     uint256 public constant INITIAL_SUPPLY = 350_000 * 10**18; // Initial supply for token in arbitrum
     uint256 public constant COMMUNITY_PRESALE_ALLOCATION = 1_500_000 * 10**18; // Allocation for presale campaign
+    uint256 public constant PURCHASE_PRICE = 1 * 10**18; // Price per token in wei for purchasing additional tokens
+    uint256 public constant DISPUTE_COST = 1 * 10**18; // Cost in wei to initiate a dispute
 
     // Chainlink variables
     address private oracle;
@@ -29,13 +31,22 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
         string description;
         string url;
         uint256 publishedAt;
+        address trader;
+        bool disputed;
     }
 
     // Array to store articles obtained from the NewsAPI
     Article[] public articles;
 
+    // Mapping to track votes for disputed articles
+    mapping(uint256 => mapping(address => bool)) public votes;
+
     // Constructor
-    constructor(address _oracle, bytes32 _jobId, uint256 _fee) ERC20("Certus Protocol Token", "CERTUS") {
+    constructor(address _oracle, bytes32 _jobId, uint256 _fee) 
+    ERC20("Certus Protocol Token", "CERTUS") 
+    Ownable(msg.sender)
+     
+    ChainlinkClient() {
         oracle = _oracle;
         jobId = _jobId;
         fee = _fee;
@@ -55,8 +66,9 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     // Function to update news data from the NewsAPI using Chainlink oracle
     function updateNews() external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.fulfillNews.selector);
-        req.add("url", "https://newsapi.org/v2/top-headlines?q=politics&apiKey=" + apiKey);
-        req.add("path", "articles[*].[title,description,url,publishedAt]");
+        req.add("url", bytes(string(abi.encodePacked("https://newsapi.org/v2/top-headlines?q=politics&apiKey=", apiKey))));
+        req.add("path", "articles");
+        req.add("copyPath", "[*].[title,description,url,publishedAt]"); // Add copyPath to specify the nested array structure
         sendChainlinkRequestTo(oracle, req, fee);
     }
 
@@ -71,7 +83,9 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
                 title: _articles[i],
                 description: _articles[i + 1],
                 url: _articles[i + 2],
-                publishedAt: uint256(_articles[i + 3])
+                publishedAt: uint256(_articles[i + 3]),
+                trader: msg.sender,
+                disputed: false
             }));
         }
 
@@ -88,5 +102,64 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     function withdrawTokens(address tokenAddress) external onlyOwner {
         IERC20 token = IERC20(tokenAddress);
         token.transfer(owner(), token.balanceOf(address(this)));
+    }
+
+    // Function to purchase additional tokens
+    function purchaseTokens(uint256 amount) external payable {
+        require(amount > 0, "Amount must be greater than 0");
+        require(msg.value == amount * PURCHASE_PRICE, "Incorrect payment amount");
+
+        // Mint tokens to the buyer
+        _mint(msg.sender, amount);
+    }
+
+    // Function to initiate a dispute for an article
+    function initiateDispute(uint256 articleIndex) external {
+        require(articleIndex < articles.length, "Invalid article index");
+        require(!articles[articleIndex].disputed, "Article is already disputed");
+        require(balanceOf(msg.sender) >= DISPUTE_COST, "Insufficient balance to initiate dispute");
+
+        // Deduct dispute cost from user's balance
+        _burn(msg.sender, DISPUTE_COST);
+
+        // Mark the article as disputed
+        articles[articleIndex].disputed = true;
+    }
+
+    // Function for users to vote on a disputed article
+    function voteOnArticle(uint256 articleIndex, bool support) external {
+        require(articleIndex < articles.length, "Invalid article index");
+        require(articles[articleIndex].disputed, "Article is not disputed");
+        require(!votes[articleIndex][msg.sender], "Already voted");
+
+        // Record user's vote
+        votes[articleIndex][msg.sender] = support;
+    }
+
+    // Function to resolve a dispute for an article
+    function resolveDispute(uint256 articleIndex) external onlyOwner {
+        require(articleIndex < articles.length, "Invalid article index");
+        require(articles[articleIndex].disputed, "Article is not disputed");
+
+        uint256 supportVotes;
+        uint256 opposeVotes;
+
+        // Count votes
+        for (uint256 i = 0; i < articles.length; i++) {
+            if (votes[articleIndex][msg.sender]) {
+                supportVotes++;
+            } else {
+                opposeVotes++;
+            }
+        }
+
+        // If majority supports the article, transfer tokens to trader
+        if (supportVotes > opposeVotes) {
+            _transfer(address(this), articles[articleIndex].trader, DISPUTE_COST * (supportVotes - opposeVotes));
+        }
+
+        // Reset votes and mark article as no longer disputed
+        delete votes[articleIndex];
+        articles[articleIndex].disputed = false;
     }
 }
