@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -33,19 +33,22 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
         uint256 publishedAt;
         address trader;
         bool disputed;
+        Vote[] votes;
+    }
+
+    // Structure to store user votes
+    struct Vote {
+        address voter;
+        bool support;
     }
 
     // Array to store articles obtained from the NewsAPI
     Article[] public articles;
 
-    // Mapping to track votes for disputed articles
-    mapping(uint256 => mapping(address => bool)) public votes;
-
     // Constructor
     constructor(address _oracle, bytes32 _jobId, uint256 _fee) 
     ERC20("Certus Protocol Token", "CERTUS") 
     Ownable(msg.sender)
-     
     ChainlinkClient() {
         oracle = _oracle;
         jobId = _jobId;
@@ -66,9 +69,10 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     // Function to update news data from the NewsAPI using Chainlink oracle
     function updateNews() external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.fulfillNews.selector);
-        req.add("url", bytes(string(abi.encodePacked("https://newsapi.org/v2/top-headlines?q=politics&apiKey=", apiKey))));
-        req.add("path", "articles");
-        req.add("copyPath", "[*].[title,description,url,publishedAt]"); // Add copyPath to specify the nested array structure
+        string memory apiUrl = string(abi.encodePacked("https://newsapi.org/v2/top-headlines?q=politics&apiKey=", apiKey));
+        req = addString(req, "url", apiUrl);
+        req = addString(req, "path", "articles");
+        req = addString(req, "copyPath", "[*].[title,description,url,publishedAt]"); // Add copyPath to specify the nested array structure
         sendChainlinkRequestTo(oracle, req, fee);
     }
 
@@ -79,14 +83,16 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
 
         // Convert response data into Article objects and store them in the articles array
         for (uint256 i = 0; i < _articles.length; i += 4) {
-            articles.push(Article({
+            Article memory newArticle = Article({
                 title: _articles[i],
                 description: _articles[i + 1],
                 url: _articles[i + 2],
-                publishedAt: uint256(_articles[i + 3]),
+                publishedAt: parseInt(_articles[i + 3]),
                 trader: msg.sender,
-                disputed: false
-            }));
+                disputed: false,
+                votes: new Vote[](0)
+            });
+            articles.push(newArticle);
         }
 
         // Emit event to notify that the data has been updated
@@ -130,10 +136,13 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     function voteOnArticle(uint256 articleIndex, bool support) external {
         require(articleIndex < articles.length, "Invalid article index");
         require(articles[articleIndex].disputed, "Article is not disputed");
-        require(!votes[articleIndex][msg.sender], "Already voted");
 
         // Record user's vote
-        votes[articleIndex][msg.sender] = support;
+        Vote memory newVote = Vote({
+            voter: msg.sender,
+            support: support
+        });
+        articles[articleIndex].votes.push(newVote);
     }
 
     // Function to resolve a dispute for an article
@@ -145,8 +154,8 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
         uint256 opposeVotes;
 
         // Count votes
-        for (uint256 i = 0; i < articles.length; i++) {
-            if (votes[articleIndex][msg.sender]) {
+        for (uint256 i = 0; i < articles[articleIndex].votes.length; i++) {
+            if (articles[articleIndex].votes[i].support) {
                 supportVotes++;
             } else {
                 opposeVotes++;
@@ -159,7 +168,30 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
         }
 
         // Reset votes and mark article as no longer disputed
-        delete votes[articleIndex];
+        delete articles[articleIndex].votes;
         articles[articleIndex].disputed = false;
+    }
+
+    // Function to add a string parameter to a Chainlink request
+    function addString(Chainlink.Request memory req, string memory key, string memory value) private pure returns (Chainlink.Request memory) {
+        if (keccak256(bytes(key)) == keccak256("url")) {
+            req.url = value;
+        } else if (keccak256(bytes(key)) == keccak256("path")) {
+            req.path = value;
+        } else if (keccak256(bytes(key)) == keccak256("copyPath")) {
+            req.copyPath = value;
+        }
+        return req;
+    }
+
+    // Function to convert string to uint256
+    function parseInt(string memory _a) internal pure returns (uint256) {
+        uint256 b = 0;
+        for (uint256 i = 0; i < bytes(_a).length; i++) {
+            if (bytes(_a)[i] >= 48 && bytes(_a)[i] <= 57) {
+                b = b * 10 + (uint256(bytes(_a)[i]) - 48);
+            }
+        }
+        return b;
     }
 }
