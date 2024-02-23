@@ -1,25 +1,51 @@
 # Certus Protocol Token
 
-Certus Protocol Token is an ERC20 token contract that includes functionality to interact with the Chainlink oracle for fetching data from the NewsAPI. It also implements standard ERC20 token functionalities such as minting, burning, and transferring tokens.
+CertusToken is a Solidity smart contract that manages an ERC20 token called "Certus Protocol Token" (symbol: CERTUS). This contract allows users to perform various actions, such as buying tokens, voting on disputed news articles, and resolving disputes.
 
 ## Features
 
-- Fetches data from the NewsAPI using the Chainlink oracle.
-- Maintains a list of articles obtained from the NewsAPI.
-- Supports standard ERC20 token functionalities.
-- Allows the owner to withdraw ETH and ERC20 tokens sent to the contract.
+- Creation of ERC20 tokens with the name "Certus Protocol Token" and symbol "CERTUS".
+- Functionality to purchase tokens at a fixed price.
+- Updating news data via the NewsAPI using a Chainlink oracle.
+- Functionality to initiate and resolve disputes over news articles.
+- Withdrawal of ETH and ERC20 tokens from the contract.
 
-## Deployment
+## Requirements
+- Node.js and npm installed locally.
+- Connection to a compatible Ethereum network (e.g., ganache, ropsten, mainnet).
+- Deployed Chainlink Oracle contracts on the desired Ethereum network.
+- Valid NewsAPI API key.
 
-The contract can be deployed on an Ethereum-compatible blockchain network using tools like Remix, Truffle, or Hardhat. Before deployment, make sure to set the necessary parameters such as the Chainlink oracle address, job ID, and fee, as well as the API key for accessing the NewsAPI.
+## Setup
+
+Clone this repository to your local machine.
+
+Install project dependencies:
+
+
+npm install
+
+- Compile and migrate the contracts to the desired Ethereum network using Truffle:
+
+truffle compile
+truffle migrate --network <network>
+
+## Configure the contract parameters:
+
+- Oracle: Address of the Chainlink oracle contract.
+- Job ID: Job ID of the Chainlink oracle for the NewsAPI.
+- Fee: Fee in LINK to be paid to the Chainlink oracle for the service.
+- API key: Valid NewsAPI API key.
 
 ## Usage
 
-1. Deploy the contract to an Ethereum-compatible blockchain network.
-2. Set the Chainlink oracle address, job ID, and fee using the constructor.
-3. Set the API key for accessing the NewsAPI using the `setApiKey` function.
-4. Mint initial tokens using the constructor or any other designated function.
-5. Interact with the contract to fetch news data from the NewsAPI and perform token transfers.
+- Set the NewsAPI API key using the setApiKey function.
+- Update news data using the updateNews function.
+- Initiate a dispute over a news article using the initiateDispute function.
+- Vote on a disputed news article using the voteOnArticle function.
+- Resolve a dispute over a news article using the resolveDispute function.
+- Purchase tokens using the purchaseTokens function.
+- Withdraw ETH and ERC20 tokens using the withdrawETH and withdrawTokens functions, respectively.
 
 ## Dependencies
 
