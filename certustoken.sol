@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 
 contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
+    using Chainlink for Chainlink.Request; // => missing library
     // Constants
     uint256 public constant MAX_SUPPLY = 2_850_000 * 10**18; // 5% of initial circulating supply mentioned in the whitepaper's tokenomics
     uint256 public constant INITIAL_SUPPLY = 350_000 * 10**18; // Initial supply for token in arbitrum
@@ -48,7 +49,7 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     // Constructor
     constructor(address _oracle, bytes32 _jobId, uint256 _fee) 
     ERC20("Certus Protocol Token", "CERTUS") 
-    Ownable(msg.sender)
+    
     ChainlinkClient() {
         oracle = _oracle;
         jobId = _jobId;
@@ -70,29 +71,42 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     function updateNews() external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.fulfillNews.selector);
         string memory apiUrl = string(abi.encodePacked("https://newsapi.org/v2/top-headlines?q=politics&apiKey=", apiKey));
-        req = addString(req, "url", apiUrl);
-        req = addString(req, "path", "articles");
-        req = addString(req, "copyPath", "[*].[title,description,url,publishedAt]"); // Add copyPath to specify the nested array structure
+        req.add("url", apiUrl);
+        req.add("path", "articles");
+        req.add("copyPath", "[*].[title,description,url,publishedAt]"); // Add copyPath to specify the nested array structure
         sendChainlinkRequestTo(oracle, req, fee);
     }
 
     // Function to handle response from the NewsAPI
-    function fulfillNews(bytes32 _requestId, string[] memory _articles) public recordChainlinkFulfillment(_requestId) {
+    function fulfillNews(
+        bytes32 _requestId,
+        string[] memory _articles,
+        bool[] memory _supports
+    ) public recordChainlinkFulfillment(_requestId) {
         // Clear existing articles
         delete articles;
 
         // Convert response data into Article objects and store them in the articles array
+        uint256 articleIndex = 0;
+        uint256 supportIndex = 0;
         for (uint256 i = 0; i < _articles.length; i += 4) {
-            Article memory newArticle = Article({
-                title: _articles[i],
-                description: _articles[i + 1],
-                url: _articles[i + 2],
-                publishedAt: parseInt(_articles[i + 3]),
-                trader: msg.sender,
-                disputed: false,
-                votes: new Vote[](0)
-            });
-            articles.push(newArticle);
+            Article storage newArticle = articles[articleIndex];
+            newArticle.title = _articles[i];
+            newArticle.description = _articles[i + 1];
+            newArticle.url = _articles[i + 2];
+            newArticle.publishedAt = parseInt(_articles[i + 3]);
+            newArticle.trader = msg.sender;
+            newArticle.disputed = false;
+
+            // Loop to copy votes to storage
+            for (uint256 j = 0; j < 3; j++) {
+                newArticle.votes.push(
+                    Vote({voter: msg.sender, support: _supports[supportIndex]})
+                );
+                supportIndex++;
+            }
+
+            articleIndex++;
         }
 
         // Emit event to notify that the data has been updated
@@ -107,7 +121,17 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
     // Function to withdraw any ERC20 tokens sent to this contract
     function withdrawTokens(address tokenAddress) external onlyOwner {
         IERC20 token = IERC20(tokenAddress);
-        token.transfer(owner(), token.balanceOf(address(this)));
+        uint256 tokenBalance = token.balanceOf(address(this));
+        require(tokenBalance > 0, "Contract has no token balance");
+
+        (bool success, ) = address(token).call(
+            abi.encodeWithSelector(
+                token.transfer.selector,
+                owner(),
+                tokenBalance
+            )
+        );
+        require(success, "Token transfer failed");
     }
 
     // Function to purchase additional tokens
@@ -172,24 +196,14 @@ contract CertusToken is ERC20, ERC20Burnable, Ownable, ChainlinkClient {
         articles[articleIndex].disputed = false;
     }
 
-    // Function to add a string parameter to a Chainlink request
-    function addString(Chainlink.Request memory req, string memory key, string memory value) private pure returns (Chainlink.Request memory) {
-        if (keccak256(bytes(key)) == keccak256("url")) {
-            req.url = value;
-        } else if (keccak256(bytes(key)) == keccak256("path")) {
-            req.path = value;
-        } else if (keccak256(bytes(key)) == keccak256("copyPath")) {
-            req.copyPath = value;
-        }
-        return req;
-    }
 
     // Function to convert string to uint256
     function parseInt(string memory _a) internal pure returns (uint256) {
         uint256 b = 0;
         for (uint256 i = 0; i < bytes(_a).length; i++) {
-            if (bytes(_a)[i] >= 48 && bytes(_a)[i] <= 57) {
-                b = b * 10 + (uint256(bytes(_a)[i]) - 48);
+            uint256 digit = uint256(uint8(bytes(_a)[i])); // Convert bytes1 to uint256
+            if (digit >= 48 && digit <= 57) {
+                b = b * 10 + (digit - 48);
             }
         }
         return b;
